@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { fetchProjects, upsertProject, updateProject as updateProjectRemote } from "./lib/projects";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line, Legend, PieChart, Pie, Cell, RadarChart, PolarGrid,
@@ -1372,8 +1373,22 @@ function SettingsModal({ open, onClose, values, onSave }) {
 // ===================================================================
 export default function App() {
   const [current, setCurrent] = useState("dashboard");
-  const [projects, setProjects] = useState(SEED_PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [expenses, setExpenses] = useState(SEED_EXPENSES);
+
+  // Load projects from Supabase on mount
+  useEffect(() => {
+    let mounted = true;
+    fetchProjects()
+      .then((list) => { if (mounted) { setProjects(list); setLoadingProjects(false); } })
+      .catch((err) => {
+        console.error("Error loading projects:", err);
+        if (mounted) setLoadingProjects(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
   const [scoring, setScoring] = useState(SEED_SCORING);
   const [budget2026] = useState(BUDGET_2026_ROWS);
   const [globalInputs, setGlobalInputs] = useState(DEFAULT_GLOBAL_INPUTS);
@@ -1385,14 +1400,25 @@ export default function App() {
 
   const openProject = projects.find(p => p.id === openProjectId);
 
-  const handleSaveProject = (p) => {
-    if (!p.id) {
-      const id = p.name.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now().toString(36);
-      setProjects(ps => [...ps, { ...p, id }]);
-    } else {
-      setProjects(ps => ps.map(x => x.id === p.id ? p : x));
-    }
+  const handleSaveProject = async (p) => {
+    const isNew = !p.id;
+    const id = isNew
+      ? p.name.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now().toString(36)
+      : p.id;
+    const project = { ...p, id };
+    // Optimistic update
+    if (isNew) setProjects(ps => [...ps, project]);
+    else setProjects(ps => ps.map(x => x.id === id ? project : x));
     setEditProject(null);
+    try {
+      await upsertProject(project);
+    } catch (err) {
+      console.error("Error saving project:", err);
+      alert("Errore salvataggio progetto: " + err.message);
+      // Rollback
+      const fresh = await fetchProjects();
+      setProjects(fresh);
+    }
   };
 
   const handleAddExpense = (e) => {
@@ -1400,8 +1426,17 @@ export default function App() {
     setAddExpenseFor(null);
   };
 
-  const updateFlags = (id, patch) => {
+  const updateFlags = async (id, patch) => {
+    // Optimistic update
     setProjects(ps => ps.map(x => x.id === id ? { ...x, ...patch } : x));
+    try {
+      await updateProjectRemote(id, patch);
+    } catch (err) {
+      console.error("Error updating project flags:", err);
+      alert("Errore aggiornamento: " + err.message);
+      const fresh = await fetchProjects();
+      setProjects(fresh);
+    }
   };
   const handleSuspend = (id) => updateFlags(id, { suspended: true, dropped: false });
   const handleResume  = (id) => updateFlags(id, { suspended: false });
@@ -1415,14 +1450,8 @@ export default function App() {
     devStatus: 0.10,
   });
 
-  // Add dropped placeholders (names only)
-  const allProjects = useMemo(() => [
-    ...projects,
-    ...DROPPED_NAMES.map(n => ({
-      id: "drop-" + n.toLowerCase().replace(/\s+/g, "-"),
-      name: n.trim(), dropped: true, status: "Dropped",
-    })),
-  ], [projects]);
+  // Dropped placeholders now come from the DB (rows with dropped=true)
+  const allProjects = projects;
 
   return (
     <div className="min-h-screen flex font-sans" style={{ backgroundColor: C.bg, color: "#1e293b" }}>
@@ -1448,21 +1477,24 @@ export default function App() {
         </header>
 
         <div className="p-6 flex-1 overflow-y-auto">
-          {current === "dashboard" && (
+          {loadingProjects && (
+            <div className="text-slate-500 text-sm">Caricamento progetti…</div>
+          )}
+          {!loadingProjects && current === "dashboard" && (
             <Dashboard projects={allProjects} expenses={expenses} budget2026={budget2026}
                        onOpenProject={(id) => setOpenProjectId(id)} />
           )}
-          {current === "pipeline" && (
+          {!loadingProjects && current === "pipeline" && (
             <Pipeline projects={allProjects} onOpenProject={setOpenProjectId} onAddProject={handleNewProject}
                       onSuspend={handleSuspend} onResume={handleResume} onArchive={handleArchive} onRestore={handleRestore} />
           )}
-          {current === "budget" && (
+          {!loadingProjects && current === "budget" && (
             <BudgetFinance projects={allProjects} expenses={expenses} budget2026={budget2026}
                            onAddExpense={setAddExpenseFor} />
           )}
-          {current === "scoring" && <Scoring scoring={scoring} setScoring={setScoring} />}
-          {current === "board" && <BoardReport projects={allProjects} expenses={expenses} budget2026={budget2026} />}
-          {current === "preauction" && <PreAuction />}
+          {!loadingProjects && current === "scoring" && <Scoring scoring={scoring} setScoring={setScoring} />}
+          {!loadingProjects && current === "board" && <BoardReport projects={allProjects} expenses={expenses} budget2026={budget2026} />}
+          {!loadingProjects && current === "preauction" && <PreAuction />}
         </div>
       </main>
 
