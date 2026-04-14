@@ -22,6 +22,7 @@ Dati originari: `Italy_Pipeline_150126.xlsx` e `ITALY_PIPELINE_BUDGET_26.xlsx`
 - **Nessun backend, nessun DB, nessuna auth** — dati hardcoded in `SEED_PROJECTS`
 
 Deploy: **Vercel** collegato a questa repo, auto-deploy su push a `main`.
+**URL live:** https://dev-platform-psi.vercel.app/
 
 ## Struttura codice
 
@@ -51,7 +52,7 @@ Attualmente tutto in un singolo file monolitico:
 ## Stato attuale
 
 - ✅ Codice su GitHub (`angelomgiordano/dev-platform`)
-- ✅ Vercel connesso, auto-deploy attivo
+- ✅ Vercel connesso, auto-deploy attivo, app live e funzionante
 - ⬜ Split del monolite in file separati
 - ⬜ Persistenza dati
 - ⬜ Funzionalità/miglioramenti specifici (da definire con Angelo)
