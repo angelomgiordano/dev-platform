@@ -376,7 +376,7 @@ function Sidebar({ current, setCurrent }) {
 // ===================================================================
 // DASHBOARD
 // ===================================================================
-function Dashboard({ projects, expenses, budget2026, onOpenProject }) {
+function Dashboard({ projects, expenses, budget2026, onOpenProject, onFunnelClick }) {
   const active = projects.filter(p => !p.dropped && !p.suspended);
   const totalMw = active.reduce((a, p) => a + (p.powerMw || 0), 0);
   const totalMwh = active.reduce((a, p) => a + (p.capacityMwh || 0), 0);
@@ -387,8 +387,9 @@ function Dashboard({ projects, expenses, budget2026, onOpenProject }) {
   // Pipeline funnel
   const funnelBuckets = TAX.devStatus.map(s => ({
     stage: s.label,
+    value: s.v,
     count: projects.filter(p => !p.dropped && !p.suspended && p.devStatus != null &&
-      Math.abs(p.devStatus - s.v) < 0.013).length,
+      Math.abs(Number(p.devStatus) - s.v) < 0.013).length,
   }));
 
   // Budget vs actual per project
@@ -478,12 +479,18 @@ function Dashboard({ projects, expenses, budget2026, onOpenProject }) {
         <div className="font-semibold mb-3" style={{ color: C.navy }}>Pipeline Funnel — Development Stage</div>
         <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
           {funnelBuckets.map((b, i) => (
-            <div key={b.stage} className="text-center p-3 rounded-lg border border-slate-200" style={{
-              background: `linear-gradient(135deg, ${C.navy}${Math.round(10 + i*12).toString(16)} 0%, white 100%)`
-            }}>
+            <button
+              key={b.stage}
+              onClick={() => onFunnelClick && onFunnelClick(b.value)}
+              className="text-center p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:shadow transition cursor-pointer"
+              style={{
+                background: `linear-gradient(135deg, ${C.navy}${Math.round(10 + i*12).toString(16)} 0%, white 100%)`
+              }}
+              title={`Filtra Pipeline per "${b.stage}"`}
+            >
               <div className="text-2xl font-bold" style={{ color: C.navy }}>{b.count}</div>
               <div className="text-[10px] uppercase tracking-wide text-slate-600 mt-1 leading-tight">{b.stage}</div>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
@@ -529,7 +536,7 @@ function Dashboard({ projects, expenses, budget2026, onOpenProject }) {
 // ===================================================================
 // PIPELINE
 // ===================================================================
-function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend, onResume, onArchive }) {
+function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend, onResume, onArchive, devStatusFilter, setDevStatusFilter }) {
   const [filters, setFilters] = useState({ status: "", regione: "", spv: "", typology: "", mode: "active" });
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
@@ -542,6 +549,7 @@ function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend,
       if (filters.mode === "suspended" && !p.suspended) return false;
       if (filters.mode === "dropped" && !p.dropped) return false;
       if (filters.status && p.status !== filters.status) return false;
+      if (devStatusFilter != null && (p.devStatus == null || Math.abs(Number(p.devStatus) - devStatusFilter) >= 0.013)) return false;
       if (filters.regione && p.regione !== filters.regione) return false;
       if (filters.spv && p.spv !== filters.spv) return false;
       if (filters.typology && p.typology !== filters.typology) return false;
@@ -596,6 +604,17 @@ function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend,
             <option value="">All typologies</option>
             {TAX.projectTypology.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
+          {devStatusFilter != null && (
+            <button
+              onClick={() => setDevStatusFilter && setDevStatusFilter(null)}
+              className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-white"
+              style={{ backgroundColor: C.navy }}
+              title="Rimuovi filtro dev stage"
+            >
+              Stage: {(TAX.devStatus.find(s => Math.abs(s.v - devStatusFilter) < 0.013)?.label) || devStatusFilter}
+              <span className="ml-1 opacity-80">✕</span>
+            </button>
+          )}
           <div className="ml-auto text-sm text-slate-500">{filtered.length} projects</div>
           <button onClick={onAddProject} className="px-3 py-1.5 text-sm rounded-lg text-white"
                   style={{ backgroundColor: C.green }}>+ New project</button>
@@ -1397,6 +1416,7 @@ export default function App() {
   const [openProjectId, setOpenProjectId] = useState(null);
   const [editProject, setEditProject] = useState(null);
   const [addExpenseFor, setAddExpenseFor] = useState(null);
+  const [pipelineDevStageFilter, setPipelineDevStageFilter] = useState(null);
 
   const openProject = projects.find(p => p.id === openProjectId);
 
@@ -1482,11 +1502,13 @@ export default function App() {
           )}
           {!loadingProjects && current === "dashboard" && (
             <Dashboard projects={allProjects} expenses={expenses} budget2026={budget2026}
-                       onOpenProject={(id) => setOpenProjectId(id)} />
+                       onOpenProject={(id) => setOpenProjectId(id)}
+                       onFunnelClick={(v) => { setPipelineDevStageFilter(v); setCurrent("pipeline"); }} />
           )}
           {!loadingProjects && current === "pipeline" && (
             <Pipeline projects={allProjects} onOpenProject={setOpenProjectId} onAddProject={handleNewProject}
-                      onSuspend={handleSuspend} onResume={handleResume} onArchive={handleArchive} onRestore={handleRestore} />
+                      onSuspend={handleSuspend} onResume={handleResume} onArchive={handleArchive} onRestore={handleRestore}
+                      devStatusFilter={pipelineDevStageFilter} setDevStatusFilter={setPipelineDevStageFilter} />
           )}
           {!loadingProjects && current === "budget" && (
             <BudgetFinance projects={allProjects} expenses={expenses} budget2026={budget2026}
