@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Login from "./Login";
+import ResetPassword from "./ResetPassword";
 import App from "./App.jsx";
 
 export default function AuthGate() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -24,6 +29,10 @@ export default function AuthGate() {
         Caricamento…
       </div>
     );
+  }
+
+  if (passwordRecovery && session) {
+    return <ResetPassword onDone={() => setPasswordRecovery(false)} />;
   }
 
   if (!session) return <Login />;
