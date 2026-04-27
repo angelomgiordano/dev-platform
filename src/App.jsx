@@ -946,12 +946,30 @@ function AddExpenseModal({ projectId, onClose, onSave }) {
 // BUDGET & FINANCE
 // ===================================================================
 function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
+  const active = projects.filter(p => !p.dropped && !p.suspended);
+  const [selectedProject, setSelectedProject] = useState("");
+
+  // Filter budget rows based on selected project
+  const filteredBudget = useMemo(() => {
+    if (!selectedProject) return budget2026;
+    const proj = active.find(p => p.id === selectedProject);
+    if (!proj) return budget2026;
+    const nameKey = proj.name.toLowerCase().split(" ")[0];
+    return budget2026.filter(r => r.label.toLowerCase().includes(nameKey));
+  }, [budget2026, selectedProject, active]);
+
+  // Filter expenses based on selected project
+  const filteredExpenses = useMemo(() => {
+    if (!selectedProject) return expenses;
+    return expenses.filter(e => e.projectId === selectedProject);
+  }, [expenses, selectedProject]);
+
   const monthlyTotals = useMemo(() => {
     return MONTHS.map((m, i) => ({
       month: m,
-      planned: budget2026.reduce((a, r) => a + (r.months[i] || 0), 0),
+      planned: filteredBudget.reduce((a, r) => a + (r.months[i] || 0), 0),
     }));
-  }, [budget2026]);
+  }, [filteredBudget]);
 
   // cumulative
   let cum = 0;
@@ -959,7 +977,7 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
 
   // actual expenses monthly (2025 + 2026)
   const actualMonthly = {};
-  expenses.forEach(e => {
+  filteredExpenses.forEach(e => {
     if (!e.date) return;
     const key = e.date.slice(0, 7);
     actualMonthly[key] = (actualMonthly[key] || 0) + e.total;
@@ -967,17 +985,51 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
 
   const byCategory = useMemo(() => {
     const cats = {};
-    budget2026.forEach(r => { cats[r.cat] = (cats[r.cat] || 0) + r.total; });
+    filteredBudget.forEach(r => { cats[r.cat] = (cats[r.cat] || 0) + r.total; });
     return Object.entries(cats).map(([name, value]) => ({ name, value }));
-  }, [budget2026]);
+  }, [filteredBudget]);
 
-  const active = projects.filter(p => !p.dropped && !p.suspended);
+  // Active projects for expenses table (when showing "All")
+  const displayProjects = selectedProject
+    ? active.filter(p => p.id === selectedProject)
+    : active;
 
   return (
     <div className="space-y-5">
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="font-semibold text-sm" style={{ color: C.navy }}>Filtra per progetto:</div>
+          <select
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm"
+            value={selectedProject}
+            onChange={e => setSelectedProject(e.target.value)}
+          >
+            <option value="">Tutti i progetti</option>
+            {active.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {selectedProject && (
+            <button
+              onClick={() => setSelectedProject("")}
+              className="text-xs rounded-lg px-2 py-1.5 text-white"
+              style={{ backgroundColor: C.navy }}
+            >
+              Mostra tutti ✕
+            </button>
+          )}
+          <div className="ml-auto text-sm text-slate-500">
+            {selectedProject
+              ? `Budget: ${fmtEur(filteredBudget.reduce((a, r) => a + r.total, 0))} · Spese: ${fmtEurD(filteredExpenses.reduce((a, e) => a + (e.total || 0), 0))}`
+              : `${active.length} progetti attivi`
+            }
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="p-5 lg:col-span-2">
-          <div className="font-semibold mb-3" style={{ color: C.navy }}>2026 Cumulative Budget Plan</div>
+          <div className="font-semibold mb-3" style={{ color: C.navy }}>
+            {selectedProject ? `${active.find(p => p.id === selectedProject)?.name} — Budget Plan` : "2026 Cumulative Budget Plan"}
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={cumulative}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
@@ -1017,7 +1069,7 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
               </tr>
             </thead>
             <tbody>
-              {budget2026.map((r, i) => (
+              {filteredBudget.map((r, i) => (
                 <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
                   <td className="py-1.5 px-2"><Badge color="slate">{r.cat}</Badge></td>
                   <td className="px-2">{r.label}</td>
@@ -1044,7 +1096,7 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold" style={{ color: C.navy }}>Project Expenses — Planned vs Actual</div>
-          <button onClick={() => onAddExpense(active[0]?.id)} className="px-3 py-1 text-xs rounded-lg text-white" style={{ backgroundColor: C.green }}>+ Add expense</button>
+          <button onClick={() => onAddExpense(selectedProject || active[0]?.id)} className="px-3 py-1 text-xs rounded-lg text-white" style={{ backgroundColor: C.green }}>+ Add expense</button>
         </div>
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wider text-slate-500 border-b">
@@ -1053,7 +1105,7 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
             <th className="text-right">Variance</th></tr>
           </thead>
           <tbody>
-            {active.map(p => {
+            {displayProjects.map(p => {
               const spent = expenses.filter(e => e.projectId === p.id).reduce((a, e) => a + e.total, 0);
               const planned = budget2026.filter(r => r.label.toLowerCase().includes(p.name.toLowerCase().split(" ")[0]))
                 .reduce((a, r) => a + r.total, 0);
