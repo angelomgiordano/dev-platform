@@ -971,7 +971,7 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
     return Object.entries(cats).map(([name, value]) => ({ name, value }));
   }, [budget2026]);
 
-  const active = projects.filter(p => !p.dropped);
+  const active = projects.filter(p => !p.dropped && !p.suspended);
 
   return (
     <div className="space-y-5">
@@ -1080,8 +1080,14 @@ function BudgetFinance({ projects, expenses, budget2026, onAddExpense }) {
 // ===================================================================
 // SCORING MATRIX
 // ===================================================================
-function Scoring({ scoring, setScoring }) {
-  const sorted = [...scoring].sort((a, b) => b.totScore - a.totScore);
+function Scoring({ scoring, setScoring, projects }) {
+  // Filter out dropped/suspended projects from scoring
+  const activeProjectIds = new Set(
+    projects.filter(p => !p.dropped && !p.suspended).map(p => p.id)
+  );
+  const sorted = [...scoring]
+    .filter(s => activeProjectIds.has(s.projectId))
+    .sort((a, b) => b.totScore - a.totScore);
   const maxScore = Math.max(...scoring.map(s => s.totScore), 1);
 
   const updScore = (i, k, v) => {
@@ -1253,14 +1259,20 @@ function BoardReport({ projects, expenses, budget2026 }) {
 // ===================================================================
 // PRE-AUCTION
 // ===================================================================
-function PreAuction() {
+function PreAuction({ projects }) {
   const [reservePremium, setReservePremium] = useState(25000);
   const [pct, setPct] = useState(0.10);
 
-  const rows = PRE_AUCTION.map(r => ({
-    ...r,
-    guarantee: r.capacity * reservePremium * pct,
-  }));
+  // Filter out dropped/suspended projects from pre-auction
+  const activeProjectIds = new Set(
+    projects.filter(p => !p.dropped && !p.suspended).map(p => p.id)
+  );
+  const rows = PRE_AUCTION
+    .filter(r => activeProjectIds.has(r.projectId))
+    .map(r => ({
+      ...r,
+      guarantee: r.capacity * reservePremium * pct,
+    }));
   const total = rows.reduce((a, r) => a + r.guarantee, 0);
 
   return (
@@ -1514,9 +1526,9 @@ export default function App() {
             <BudgetFinance projects={allProjects} expenses={expenses} budget2026={budget2026}
                            onAddExpense={setAddExpenseFor} />
           )}
-          {!loadingProjects && current === "scoring" && <Scoring scoring={scoring} setScoring={setScoring} />}
+          {!loadingProjects && current === "scoring" && <Scoring scoring={scoring} setScoring={setScoring} projects={allProjects} />}
           {!loadingProjects && current === "board" && <BoardReport projects={allProjects} expenses={expenses} budget2026={budget2026} />}
-          {!loadingProjects && current === "preauction" && <PreAuction />}
+          {!loadingProjects && current === "preauction" && <PreAuction projects={allProjects} />}
         </div>
       </main>
 
