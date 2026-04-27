@@ -933,22 +933,72 @@ function EditProjectModal({ project, onClose, onSave }) {
               })}
             </div>
           </div>
+          {/* --- General --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">General</div>
           <Field label="Project Name" k="name" />
           <Field label="Opportunity Status" k="status" opts={TAX.opportunityStatus} />
           <Field label="SPV" k="spv" opts={TAX.spv} />
+          <Field label="Typology" k="typology" opts={TAX.projectTypology} />
+          <Field label="Development Mode" k="devMode" opts={TAX.devMode} />
+          <div>
+            <label className="text-xs text-slate-500">Development Stage (funnel)</label>
+            <select className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
+                    value={f.devStatus ?? ""} onChange={e => upd("devStatus", e.target.value ? Number(e.target.value) : null)}>
+              <option value="">—</option>
+              {TAX.devStatus.map(s => <option key={s.v} value={s.v}>{s.label} ({s.v})</option>)}
+            </select>
+          </div>
+          <Field label="Estimated RTB" k="rtb" />
+
+          {/* --- Location & Size --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">Location & Size</div>
           <Field label="Market Zone" k="marketZone" opts={TAX.marketZone} />
           <Field label="Region" k="regione" />
           <Field label="Province" k="provincia" />
           <Field label="Comune" k="comune" />
-          <Field label="Typology" k="typology" opts={TAX.projectTypology} />
           <Field label="Power (MW)" k="powerMw" type="number" />
           <Field label="Hours" k="capacityH" type="number" />
           <Field label="Capacity (MWh)" k="capacityMwh" type="number" />
-          <Field label="Estimated RTB" k="rtb" />
-          <Field label="STMG status" k="stmg" opts={TAX.stmg} />
+
+          {/* --- Grid & STMG --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">Grid & STMG</div>
+          <Field label="STMG Status" k="stmg" opts={TAX.stmg} />
+          <Field label="COD Pratica" k="codPratica" type="number" />
+          <Field label="STMG Request Date" k="stmgRequest" type="date" />
+          <Field label="STMG Received Date" k="stmgReceived" type="date" />
+          <Field label="STMG Expiration" k="stmgExpiration" type="date" />
+          <Field label="Connection Voltage" k="connection" />
+          <Field label="Substation Voltage (kV)" k="esVolt" type="number" />
+          <Field label="Distance to Substation (km)" k="esDist" type="number" />
+          <Field label="STMG Acceptance VAT (€)" k="stmgAccVat" type="number" />
+          <Field label="Connection Total Cost (€)" k="connectionTotCost" type="number" />
+
+          {/* --- Land --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">Land</div>
           <Field label="Land Type" k="landType" opts={TAX.landType} />
           <Field label="Land Status" k="landStatus" opts={TAX.landStatus} />
-          <Field label="Development Mode" k="devMode" opts={TAX.devMode} />
+          <Field label="Hectares" k="ha" type="number" />
+          <Field label="LOI Signed" k="loiSign" type="date" />
+          <Field label="LOI Expiration" k="loiExp" type="date" />
+
+          {/* --- Development & Fees --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">Development & Fees</div>
+          <Field label="Originator" k="originator" />
+          <Field label="Origination Fee €/MW" k="origFeePerMw" type="number" />
+          <Field label="Total Origination Fee" k="totOrigFee" type="number" />
+          <Field label="Developer" k="developer" />
+          <Field label="Dev Fee €/MW" k="devFee" type="number" />
+          <Field label="Total Dev Fee" k="totDevFee" type="number" />
+
+          {/* --- Milestones --- */}
+          <div className="col-span-2 text-xs uppercase tracking-wider text-slate-500 font-medium mt-2 border-b pb-1">Milestones</div>
+          <Field label="M1 (Land)" k="m1" type="number" />
+          <Field label="M2 (Land+STMG)" k="m2" type="number" />
+          <Field label="M3" k="m3" type="number" />
+          <Field label="M4 (RTB)" k="m4" type="number" />
+          <Field label="M5 (COD)" k="m5" type="number" />
+
+          {/* --- Comments --- */}
           <div className="col-span-2">
             <label className="text-xs text-slate-500">Comments</label>
             <textarea rows={3} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
