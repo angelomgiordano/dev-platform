@@ -384,13 +384,20 @@ function Dashboard({ projects, expenses, budget2026, onOpenProject, onFunnelClic
   const spentToDate = expenses.reduce((a, e) => a + (e.total || 0), 0);
   const budgetUsed = (spentToDate / budget26Total) * 100;
 
-  // Pipeline funnel
-  const funnelBuckets = TAX.devStatus.map(s => ({
-    stage: s.label,
-    value: s.v,
-    count: projects.filter(p => !p.dropped && !p.suspended && p.devStatus != null &&
-      Math.abs(Number(p.devStatus) - s.v) < 0.013).length,
-  }));
+  // Pipeline funnel — nearest-match (each project counted in exactly one bucket)
+  const funnelBuckets = (() => {
+    const counts = TAX.devStatus.map(() => 0);
+    projects.filter(p => !p.dropped && !p.suspended && p.devStatus != null).forEach(p => {
+      const v = Number(p.devStatus);
+      let bestIdx = 0, bestDist = Infinity;
+      TAX.devStatus.forEach((s, i) => {
+        const d = Math.abs(v - s.v);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      });
+      counts[bestIdx]++;
+    });
+    return TAX.devStatus.map((s, i) => ({ stage: s.label, value: s.v, count: counts[i] }));
+  })();
 
   // Budget vs actual per project
   const budgetByProj = {};
@@ -573,7 +580,14 @@ function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend,
       if (filters.mode === "suspended" && !p.suspended) return false;
       if (filters.mode === "dropped" && !p.dropped) return false;
       if (filters.status && p.status !== filters.status) return false;
-      if (devStatusFilter != null && (p.devStatus == null || Math.abs(Number(p.devStatus) - devStatusFilter) >= 0.013)) return false;
+      if (devStatusFilter != null) {
+        if (p.devStatus == null) return false;
+        // nearest-match: this project's closest stage must be the filter stage
+        const v = Number(p.devStatus);
+        let bestV = TAX.devStatus[0].v, bestDist = Infinity;
+        TAX.devStatus.forEach(s => { const d = Math.abs(v - s.v); if (d < bestDist) { bestDist = d; bestV = s.v; } });
+        if (Math.abs(bestV - devStatusFilter) > 0.001) return false;
+      }
       if (filters.regione && p.regione !== filters.regione) return false;
       if (filters.spv && p.spv !== filters.spv) return false;
       if (filters.typology && p.typology !== filters.typology) return false;
@@ -635,7 +649,7 @@ function Pipeline({ projects, onOpenProject, onAddProject, onRestore, onSuspend,
               style={{ backgroundColor: C.navy }}
               title="Rimuovi filtro dev stage"
             >
-              Stage: {(TAX.devStatus.find(s => Math.abs(s.v - devStatusFilter) < 0.013)?.label) || devStatusFilter}
+              Stage: {(TAX.devStatus.find(s => Math.abs(s.v - devStatusFilter) < 0.001)?.label) || devStatusFilter}
               <span className="ml-1 opacity-80">✕</span>
             </button>
           )}
