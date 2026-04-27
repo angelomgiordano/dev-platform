@@ -496,6 +496,30 @@ function Dashboard({ projects, expenses, budget2026, onOpenProject, onFunnelClic
       </Card>
 
       <Card className="p-5">
+        <div className="font-semibold mb-3" style={{ color: C.navy }}>STMG Status Breakdown</div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+          {TAX.stmg.filter(s => s !== "TBD").map(s => {
+            const count = active.filter(p => p.stmg && p.stmg.toLowerCase() === s.toLowerCase()).length;
+            return (
+              <div key={s} className="text-center p-3 rounded-lg border border-slate-200">
+                <div className="text-2xl font-bold" style={{ color: stmgColor(s) === "green" ? C.green : stmgColor(s) === "navy" ? C.navy : stmgColor(s) === "amber" ? "#d97706" : C.orange }}>{count}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-600 mt-1 leading-tight">{s}</div>
+              </div>
+            );
+          })}
+          {(() => {
+            const noStmg = active.filter(p => !p.stmg).length;
+            return noStmg > 0 ? (
+              <div className="text-center p-3 rounded-lg border border-slate-200">
+                <div className="text-2xl font-bold text-slate-400">{noStmg}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-600 mt-1 leading-tight">N/A</div>
+              </div>
+            ) : null;
+          })()}
+        </div>
+      </Card>
+
+      <Card className="p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold" style={{ color: C.navy }}>Active Projects — Snapshot</div>
           <div className="text-xs text-slate-500">Click a project to open detail</div>
@@ -825,7 +849,29 @@ function ProjectDetail({ project, expenses, onClose, onEdit, onAddExpense }) {
 function EditProjectModal({ project, onClose, onSave }) {
   const [f, setF] = useState(project);
   if (!project) return null;
-  const upd = (k, v) => setF(s => ({...s, [k]: v}));
+
+  // Auto-sync: when stmg changes, suggest a devStatus update
+  const STMG_TO_DEV = {
+    "to be prepared": 0.10,
+    "prepared to be submitted": 0.15,
+    "submitted": 0.15,
+    "received": 0.20,
+    "accepted": 0.25,
+  };
+
+  const upd = (k, v) => {
+    setF(s => {
+      const next = { ...s, [k]: v };
+      // If stmg changed, auto-update devStatus if the new stage is further along
+      if (k === "stmg" && v) {
+        const suggested = STMG_TO_DEV[v.toLowerCase()];
+        if (suggested != null && (next.devStatus == null || suggested > Number(next.devStatus))) {
+          next.devStatus = suggested;
+        }
+      }
+      return next;
+    });
+  };
   const Field = ({ label, k, type = "text", opts }) => (
     <div>
       <label className="text-xs text-slate-500">{label}</label>
